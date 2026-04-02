@@ -216,11 +216,38 @@ const LiveSystem = ({
   };
 
   const exportDrawing = () => {
-    if (!drawingCanvasRef.current) {
+    if (!drawingCanvasRef.current || drawingCanvasRef.current.width === 0 || drawingCanvasRef.current.height === 0) {
       return undefined;
     }
 
-    return drawingCanvasRef.current.toDataURL("image/png");
+    const source = drawingCanvasRef.current;
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = source.width;
+    exportCanvas.height = source.height;
+
+    const exportCtx = exportCanvas.getContext("2d");
+    if (!exportCtx) {
+      return undefined;
+    }
+
+    exportCtx.fillStyle = "#000000";
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(source, 0, 0);
+
+    const pixels = exportCtx.getImageData(0, 0, exportCanvas.width, exportCanvas.height).data;
+    let hasInk = false;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] > 0 || pixels[index + 1] > 0 || pixels[index + 2] > 0) {
+        hasInk = true;
+        break;
+      }
+    }
+
+    if (!hasInk) {
+      return undefined;
+    }
+
+    return exportCanvas.toDataURL("image/png");
   };
 
   const getFingerStates = (landmarks: Landmark[]) => {

@@ -161,6 +161,7 @@ export function useAirWriting() {
 
   const predictNow = async (imageData?: string) => {
     if (!imageData) {
+      setRuntimeError("Draw something in the canvas before requesting a prediction.");
       return { prediction: null };
     }
 
@@ -183,10 +184,20 @@ export function useAirWriting() {
           }
         : null;
 
+      if (!prediction) {
+        setStatus((current) => ({
+          ...current,
+          prediction: null,
+        }));
+        setRuntimeError(response.message || "No drawing detected.");
+        return { prediction: null };
+      }
+
       setStatus((current) => ({
         ...current,
         prediction,
       }));
+      setRuntimeError(null);
 
       return { prediction };
     } catch (nextError) {
