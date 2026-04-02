@@ -253,6 +253,8 @@ const LiveSystem = ({
   };
 
   const annotateFrame = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const now = performance.now();
+    const holdTimeMs = (settingsRef.current?.hold_time_seconds ?? 1.2) * 1000;
     ctx.save();
     ctx.fillStyle = "rgba(2, 6, 23, 0.52)";
     ctx.fillRect(14, 14, 240, 84);
@@ -264,6 +266,21 @@ const LiveSystem = ({
       ctx.fillStyle = "#67e8f9";
       ctx.font = "bold 20px Arial";
       ctx.fillText(`Pred: ${status.prediction.label} (${status.prediction.confidence.toFixed(1)}%)`, 26, 74);
+    }
+
+    if (pendingGestureRef.current && !gestureLockedRef.current) {
+      const elapsedSeconds = Math.min((now - gestureStartTimeRef.current) / 1000, holdTimeMs / 1000);
+      ctx.fillStyle = "#facc15";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(`Hold ${pendingGestureRef.current}... ${elapsedSeconds.toFixed(1)}s`, 26, 104);
+    } else if (now - confirmationTimeRef.current < 1000) {
+      ctx.fillStyle = "#4ade80";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(`${currentModeRef.current.toUpperCase()} CONFIRMED`, 26, 104);
+    } else if (status?.hand_detected) {
+      ctx.fillStyle = "#93c5fd";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("Hand detected", 26, 104);
     }
 
     ctx.strokeStyle = "rgba(34,211,238,0.7)";
