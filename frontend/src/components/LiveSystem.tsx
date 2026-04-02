@@ -32,6 +32,29 @@ const RING_TIP = 16;
 const RING_PIP = 14;
 const PINKY_TIP = 20;
 const PINKY_PIP = 18;
+const HAND_CONNECTIONS: Array<[number, number]> = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [0, 5],
+  [5, 6],
+  [6, 7],
+  [7, 8],
+  [5, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [9, 13],
+  [13, 14],
+  [14, 15],
+  [15, 16],
+  [13, 17],
+  [17, 18],
+  [18, 19],
+  [19, 20],
+  [0, 17],
+];
 
 const gestures = [
   { title: "Write", detail: "Raise your index finger" },
@@ -124,6 +147,7 @@ const LiveSystem = ({
   const gestureLockedRef = useRef(false);
   const previousPointRef = useRef<{ x: number; y: number } | null>(null);
   const lastPredictionTriggerRef = useRef(0);
+  const lastLandmarksRef = useRef<Landmark[] | null>(null);
   const settingsRef = useRef(status?.settings);
 
   useEffect(() => {
@@ -164,6 +188,7 @@ const LiveSystem = ({
     pendingGestureRef.current = null;
     gestureLockedRef.current = false;
     currentModeRef.current = "pause";
+    lastLandmarksRef.current = null;
 
     onUpdateTrackingStatus({
       camera_active: false,
@@ -228,7 +253,6 @@ const LiveSystem = ({
   };
 
   const annotateFrame = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    ctx.clearRect(0, 0, width, height);
     ctx.save();
     ctx.fillStyle = "rgba(2, 6, 23, 0.52)";
     ctx.fillRect(14, 14, 240, 84);
@@ -244,6 +268,34 @@ const LiveSystem = ({
 
     ctx.strokeStyle = "rgba(34,211,238,0.7)";
     ctx.strokeRect(1, 1, width - 2, height - 2);
+    ctx.restore();
+  };
+
+  const drawHandOverlay = (ctx: CanvasRenderingContext2D, landmarks: Landmark[], width: number, height: number) => {
+    ctx.save();
+    ctx.strokeStyle = "rgba(34, 211, 238, 0.85)";
+    ctx.lineWidth = 2.5;
+
+    for (const [start, end] of HAND_CONNECTIONS) {
+      const startPoint = landmarks[start];
+      const endPoint = landmarks[end];
+      if (!startPoint || !endPoint) {
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo((1 - startPoint.x) * width, startPoint.y * height);
+      ctx.lineTo((1 - endPoint.x) * width, endPoint.y * height);
+      ctx.stroke();
+    }
+
+    for (const landmark of landmarks) {
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.arc((1 - landmark.x) * width, landmark.y * height, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
   };
 
@@ -310,6 +362,8 @@ const LiveSystem = ({
       return;
     }
 
+    ctx.clearRect(0, 0, width, height);
+
     if (video.currentTime !== lastVideoTimeRef.current) {
       lastVideoTimeRef.current = video.currentTime;
       const result = landmarker.detectForVideo(video, performance.now());
@@ -317,6 +371,7 @@ const LiveSystem = ({
       const now = performance.now();
 
       if (landmarks) {
+        lastLandmarksRef.current = landmarks;
         const gesture = getGesture(landmarks);
         const holdTime = (settingsRef.current?.hold_time_seconds ?? 1.2) * 1000;
         const delayAfterConfirm = 260;
@@ -360,6 +415,7 @@ const LiveSystem = ({
           frame_updated_at: Date.now(),
         });
       } else {
+        lastLandmarksRef.current = null;
         previousPointRef.current = null;
         onUpdateTrackingStatus({
           camera_active: true,
@@ -374,6 +430,11 @@ const LiveSystem = ({
     if (drawingCanvasRef.current) {
       ctx.drawImage(drawingCanvasRef.current, 0, 0, width, height);
     }
+
+    if (lastLandmarksRef.current) {
+      drawHandOverlay(ctx, lastLandmarksRef.current, width, height);
+    }
+
     annotateFrame(ctx, width, height);
 
     animationFrameRef.current = window.requestAnimationFrame(() => {
