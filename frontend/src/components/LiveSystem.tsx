@@ -228,6 +228,7 @@ const LiveSystem = ({
   };
 
   const annotateFrame = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    ctx.clearRect(0, 0, width, height);
     ctx.save();
     ctx.fillStyle = "rgba(2, 6, 23, 0.52)";
     ctx.fillRect(14, 14, 240, 84);
@@ -308,11 +309,6 @@ const LiveSystem = ({
     if (!ctx) {
       return;
     }
-
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -width, 0, width, height);
-    ctx.restore();
 
     if (video.currentTime !== lastVideoTimeRef.current) {
       lastVideoTimeRef.current = video.currentTime;
@@ -470,12 +466,6 @@ const LiveSystem = ({
 
   return (
     <section id="demo" className="relative py-24 px-4">
-      <video
-        ref={videoRef}
-        className="absolute pointer-events-none opacity-0 -z-10 h-px w-px"
-        playsInline
-        muted
-      />
       <div className={`${isExpanded ? "max-w-[1800px]" : "max-w-7xl"} mx-auto transition-all duration-300`}>
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -550,11 +540,24 @@ const LiveSystem = ({
             <div
               className={`rounded-3xl border border-glass-border bg-secondary/30 overflow-hidden ${
                 isExpanded ? "min-h-[70vh]" : "aspect-video"
-              } flex items-center justify-center`}
+              } flex items-center justify-center relative`}
             >
-              {cameraActive ? (
-                <canvas ref={displayCanvasRef} className="w-full h-full object-contain bg-black/40" />
-              ) : (
+              <video
+                ref={videoRef}
+                className={`absolute inset-0 h-full w-full object-contain bg-black/40 scale-x-[-1] transition-opacity ${
+                  cameraActive ? "opacity-100" : "opacity-0"
+                }`}
+                playsInline
+                muted
+                autoPlay
+              />
+              <canvas
+                ref={displayCanvasRef}
+                className={`absolute inset-0 h-full w-full object-contain pointer-events-none transition-opacity ${
+                  cameraActive ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              {!cameraActive ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-6">
                   <Camera className="w-12 h-12 text-muted-foreground/40" />
                   <div className="mt-4 text-lg font-semibold text-foreground">Camera offline</div>
@@ -562,7 +565,7 @@ const LiveSystem = ({
                     Start the camera to use your own browser webcam for the live hand-tracking demo.
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {error ? (
