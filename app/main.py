@@ -1,17 +1,14 @@
-# main.py
+import os
 
-import cv2
-import time
-
-from app.hand_tracking import HandTracker
-from app.gesture import get_finger_states, get_gesture
-from app.drawing import DrawingEngine
-from utils.constants import *
-from utils.preprocess import preprocess_image
-from ml.inference import predict
+import uvicorn
 
 
 def main():
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app.api:app", host=host, port=port, reload=False)
+    return
+    """
     cap = cv2.VideoCapture(0)
     cap.set(3, CAMERA_WIDTH)
     cap.set(4, CAMERA_HEIGHT)
@@ -159,6 +156,7 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
+    """
 
 
 if __name__ == "__main__":
