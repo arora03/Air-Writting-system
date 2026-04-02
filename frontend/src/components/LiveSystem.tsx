@@ -40,6 +40,34 @@ const gestures = [
   { title: "Predict", detail: "Show a thumbs-up to classify" },
 ];
 
+function waitForVideoReady(video: HTMLVideoElement) {
+  if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const onLoaded = () => {
+      cleanup();
+      resolve();
+    };
+
+    const onError = () => {
+      cleanup();
+      reject(new Error("The browser camera stream did not become ready."));
+    };
+
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", onLoaded);
+      video.removeEventListener("canplay", onLoaded);
+      video.removeEventListener("error", onError);
+    };
+
+    video.addEventListener("loadedmetadata", onLoaded, { once: true });
+    video.addEventListener("canplay", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
 function getCameraErrorMessage(error: unknown) {
   if (error instanceof DOMException) {
     if (error.name === "NotAllowedError") {
@@ -258,6 +286,13 @@ const LiveSystem = ({
       return;
     }
 
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+      animationFrameRef.current = window.requestAnimationFrame(() => {
+        void processFrame();
+      });
+      return;
+    }
+
     const width = video.videoWidth || 640;
     const height = video.videoHeight || 480;
 
@@ -385,6 +420,7 @@ const LiveSystem = ({
 
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      await waitForVideoReady(videoRef.current);
 
       if (!handLandmarkerRef.current) {
         const vision = await FilesetResolver.forVisionTasks(
@@ -434,7 +470,12 @@ const LiveSystem = ({
 
   return (
     <section id="demo" className="relative py-24 px-4">
-      <video ref={videoRef} className="hidden" playsInline muted />
+      <video
+        ref={videoRef}
+        className="absolute pointer-events-none opacity-0 -z-10 h-px w-px"
+        playsInline
+        muted
+      />
       <div className={`${isExpanded ? "max-w-[1800px]" : "max-w-7xl"} mx-auto transition-all duration-300`}>
         <motion.div
           initial={{ opacity: 0, y: 24 }}
