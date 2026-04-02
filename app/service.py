@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 
@@ -16,11 +17,7 @@ class AirWritingService:
         self._lock = threading.RLock()
         self._thread = None
         self._capture = None
-        self._tracker = HandTracker(
-            max_hands=MAX_HANDS,
-            detection_conf=DETECTION_CONFIDENCE,
-            tracking_conf=TRACKING_CONFIDENCE,
-        )
+        self._tracker = None
         self._latest_frame = None
         self._running = False
 
@@ -66,7 +63,23 @@ class AirWritingService:
             self._drawer.alpha = 0.6 if self._smoothing_enabled else 0.0
             self._drawer.thickness = max(1, min(int(thickness), 18))
 
-            capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            try:
+                tracker = HandTracker(
+                    max_hands=MAX_HANDS,
+                    detection_conf=DETECTION_CONFIDENCE,
+                    tracking_conf=TRACKING_CONFIDENCE,
+                )
+            except Exception as exc:
+                self._error = (
+                    "Hand tracking is unavailable in this environment. "
+                    "Use local desktop mode for the live camera demo."
+                )
+                raise RuntimeError(self._error) from exc
+
+            if os.name == "nt":
+                capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            else:
+                capture = cv2.VideoCapture(0)
             capture.set(3, CAMERA_WIDTH)
             capture.set(4, CAMERA_HEIGHT)
             capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -78,6 +91,7 @@ class AirWritingService:
                 raise RuntimeError(self._error)
 
             self._capture = capture
+            self._tracker = tracker
             self._running = True
             self._thread = threading.Thread(target=self._run_loop, daemon=True)
             self._thread.start()
