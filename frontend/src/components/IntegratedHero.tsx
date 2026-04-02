@@ -36,7 +36,7 @@ const IntegratedHero = ({ status, loading }: IntegratedHeroProps) => {
             transition={{ delay: 0.2 }}
             className="mt-6 max-w-2xl text-lg sm:text-xl text-muted-foreground"
           >
-            The site now controls the real webcam-based tracking pipeline in this repo, streams the processed frames, and shows live MNIST digit predictions. EMNIST letters are the next training milestone.
+            The site now uses the visitor&apos;s browser camera for live hand tracking and sends the drawn character to the Python backend for MNIST digit prediction. EMNIST letters are the next training milestone.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 24 }}

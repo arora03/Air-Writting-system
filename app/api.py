@@ -1,7 +1,10 @@
+import base64
 import os
 from pathlib import Path
 from typing import Optional
 
+import cv2
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -9,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.service import service
+from ml.inference import predict_with_scores
+from utils.preprocess import preprocess_image
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -19,6 +24,10 @@ class SettingsPayload(BaseModel):
     smoothing: Optional[bool] = None
     thickness: Optional[int] = None
     sensitivity: Optional[int] = None
+
+
+class ImagePredictionPayload(BaseModel):
+    image_data: str
 
 
 app = FastAPI(title="Air Writing AI API", version="1.0.0")
@@ -82,6 +91,35 @@ def predict_now():
     return {
         "prediction": prediction,
         "status": service.get_status(),
+    }
+
+
+@app.post("/api/predict-image")
+def predict_image(payload: ImagePredictionPayload):
+    image_data = payload.image_data
+    if "," in image_data:
+        image_data = image_data.split(",", 1)[1]
+
+    try:
+        raw_bytes = base64.b64decode(image_data)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid image payload.") from exc
+
+    image_buffer = np.frombuffer(raw_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_buffer, cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Unable to decode image.")
+
+    processed = preprocess_image(image)
+    if processed is None:
+        return {
+            "prediction": None,
+            "message": "No drawing detected.",
+        }
+
+    return {
+        "prediction": predict_with_scores(processed),
+        "message": "Prediction successful.",
     }
 
 

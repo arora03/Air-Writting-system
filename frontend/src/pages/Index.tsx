@@ -20,12 +20,11 @@ const Index = () => {
     loading,
     error,
     activeAction,
-    streamUrl,
-    startCamera,
-    stopCamera,
     clearCanvas,
     predictNow,
     updateSettings,
+    updateTrackingStatus,
+    setRuntimeError,
   } = useAirWriting();
 
   const prediction = status?.prediction ?? null;
@@ -49,11 +48,10 @@ const Index = () => {
         loading={loading}
         error={error}
         activeAction={activeAction}
-        streamUrl={streamUrl}
-        onStartCamera={startCamera}
-        onStopCamera={stopCamera}
         onClearCanvas={clearCanvas}
         onPredict={predictNow}
+        onUpdateTrackingStatus={updateTrackingStatus}
+        onSetError={setRuntimeError}
       />
       <SystemOverview status={status} error={error} />
       <PredictionInsights prediction={prediction} onAppendPrediction={appendPrediction} />

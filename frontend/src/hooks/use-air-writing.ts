@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type Prediction = {
   label: string;
@@ -11,6 +11,7 @@ export type Prediction = {
 };
 
 export type AirWritingStatus = {
+  backend_online: boolean;
   camera_active: boolean;
   hand_detected: boolean;
   current_mode: string;
@@ -39,6 +40,12 @@ type ApiError = {
   detail?: string;
 };
 
+type HealthResponse = {
+  ok: boolean;
+  camera_active: boolean;
+  model: AirWritingStatus["model"];
+};
+
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 function buildApiUrl(path: string) {
@@ -62,7 +69,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
         message = error.detail;
       }
     } catch {
-      // Keep the generic fallback when the response body is empty.
+      // Keep fallback.
     }
     throw new Error(message);
   }
@@ -70,44 +77,54 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+const defaultModel: AirWritingStatus["model"] = {
+  name: "mnist-cnn",
+  dataset: "MNIST",
+  supported_labels: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  letters_available: false,
+  next_dataset: "EMNIST Letters",
+  model_path: "mnist_cnn.pth",
+};
+
+const defaultStatus: AirWritingStatus = {
+  backend_online: false,
+  camera_active: false,
+  hand_detected: false,
+  current_mode: "pause",
+  pending_gesture: null,
+  gesture_locked: false,
+  prediction: null,
+  frame_updated_at: null,
+  error: null,
+  settings: {
+    smoothing: true,
+    thickness: 12,
+    sensitivity: 70,
+    hold_time_seconds: 1.23,
+  },
+  model: defaultModel,
+};
+
 export function useAirWriting() {
-  const [status, setStatus] = useState<AirWritingStatus | null>(null);
+  const [status, setStatus] = useState<AirWritingStatus>(defaultStatus);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [streamVersion, setStreamVersion] = useState(0);
 
-  useEffect(() => {
-    if (!status?.camera_active) {
-      return;
-    }
-
-    const stopCameraOnUnload = () => {
-      fetch(buildApiUrl("/api/control/stop"), {
-        method: "POST",
-        keepalive: true,
-      }).catch(() => {
-        // The backend also has an inactivity timeout as a fallback.
-      });
-    };
-
-    window.addEventListener("pagehide", stopCameraOnUnload);
-    window.addEventListener("beforeunload", stopCameraOnUnload);
-
-    return () => {
-      window.removeEventListener("pagehide", stopCameraOnUnload);
-      window.removeEventListener("beforeunload", stopCameraOnUnload);
-      stopCameraOnUnload();
-    };
-  }, [status?.camera_active]);
-
-  const refreshStatus = async () => {
+  const refreshHealth = async () => {
     try {
-      const nextStatus = await requestJson<AirWritingStatus>("/api/status");
-      setStatus(nextStatus);
-      setError(nextStatus.error);
+      const response = await requestJson<HealthResponse>("/api/health");
+      setStatus((current) => ({
+        ...current,
+        backend_online: response.ok,
+        model: response.model,
+      }));
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "Unable to reach backend API.";
+      setStatus((current) => ({
+        ...current,
+        backend_online: false,
+      }));
       setError(message);
     } finally {
       setLoading(false);
@@ -115,99 +132,115 @@ export function useAirWriting() {
   };
 
   useEffect(() => {
-    void refreshStatus();
-
-    const intervalId = window.setInterval(() => {
-      void refreshStatus();
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
+    void refreshHealth();
   }, []);
 
-  const runAction = async <T,>(
-    label: string,
-    action: () => Promise<T>,
-    options?: { refreshAfter?: boolean },
-  ) => {
-    setActiveAction(label);
-    setError(null);
+  const setRuntimeError = (message: string | null) => {
+    setError(message);
+    setStatus((current) => ({
+      ...current,
+      error: message,
+    }));
+  };
+
+  const updateTrackingStatus = (patch: Partial<AirWritingStatus>) => {
+    setStatus((current) => ({
+      ...current,
+      ...patch,
+    }));
+  };
+
+  const clearCanvas = async () => {
+    setStatus((current) => ({
+      ...current,
+      prediction: null,
+      current_mode: "pause",
+      pending_gesture: null,
+    }));
+  };
+
+  const predictNow = async (imageData?: string) => {
+    if (!imageData) {
+      return { prediction: null };
+    }
+
+    setActiveAction("predict");
+    setRuntimeError(null);
 
     try {
-      const result = await action();
-      if (options?.refreshAfter) {
-        await refreshStatus();
-      }
-      return result;
+      const response = await requestJson<{ prediction: Omit<Prediction, "timestamp"> | null; message: string }>(
+        "/api/predict-image",
+        {
+          method: "POST",
+          body: JSON.stringify({ image_data: imageData }),
+        },
+      );
+
+      const prediction = response.prediction
+        ? {
+            ...response.prediction,
+            timestamp: Date.now(),
+          }
+        : null;
+
+      setStatus((current) => ({
+        ...current,
+        prediction,
+      }));
+
+      return { prediction };
     } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : "Request failed.";
-      setError(message);
+      const message = nextError instanceof Error ? nextError.message : "Prediction request failed.";
+      setRuntimeError(message);
       throw nextError;
     } finally {
       setActiveAction(null);
     }
   };
 
-  const applyStatus = (nextStatus: AirWritingStatus) => {
-    setStatus(nextStatus);
-    setError(nextStatus.error);
-    setLoading(false);
-  };
-
-  const startCamera = async () => {
-    const nextStatus = await runAction("start", () =>
-      requestJson<AirWritingStatus>("/api/control/start", { method: "POST" }),
-    );
-    applyStatus(nextStatus);
-    setStreamVersion((current) => current + 1);
-  };
-
-  const stopCamera = async () => {
-    const nextStatus = await runAction("stop", () =>
-      requestJson<AirWritingStatus>("/api/control/stop", { method: "POST" }),
-    );
-    applyStatus(nextStatus);
-    setStreamVersion((current) => current + 1);
-  };
-
-  const clearCanvas = async () => {
-    const nextStatus = await runAction("clear", () =>
-      requestJson<AirWritingStatus>("/api/control/clear", { method: "POST" }),
-    );
-    applyStatus(nextStatus);
-  };
-
-  const predictNow = async () => {
-    return runAction(
-      "predict",
-      () =>
-        requestJson<{ prediction: Prediction | null; status: AirWritingStatus }>("/api/control/predict", {
-          method: "POST",
-        }),
-      { refreshAfter: true },
-    );
-  };
-
   const updateSettings = async (payload: Partial<AirWritingStatus["settings"]>) => {
-    const nextStatus = await runAction("settings", () =>
-      requestJson<AirWritingStatus>("/api/settings", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }),
-    );
-    applyStatus(nextStatus);
+    setActiveAction("settings");
+    setStatus((current) => {
+      const nextSettings = {
+        ...current.settings,
+        ...payload,
+      };
+
+      const sensitivity = nextSettings.sensitivity;
+      const holdTimeSeconds = Number(
+        (2.1 - ((sensitivity - 10) / 90) * 1.3).toFixed(2),
+      );
+
+      return {
+        ...current,
+        settings: {
+          ...nextSettings,
+          hold_time_seconds: holdTimeSeconds,
+        },
+      };
+    });
+    setActiveAction(null);
   };
+
+  const apiInfo = useMemo(
+    () => ({
+      apiBaseUrl,
+      predictEndpoint: buildApiUrl("/api/predict-image"),
+    }),
+    [],
+  );
 
   return {
     status,
     loading,
     error,
     activeAction,
-    streamUrl: buildApiUrl(`/api/stream?stream=${streamVersion}`),
-    refreshStatus,
-    startCamera,
-    stopCamera,
+    refreshStatus: refreshHealth,
     clearCanvas,
     predictNow,
     updateSettings,
+    updateTrackingStatus,
+    setRuntimeError,
+    apiInfo,
   };
 }

@@ -11,8 +11,8 @@ const SystemOverview = ({ status, error }: SystemOverviewProps) => {
   const cards = [
     {
       label: "Backend API",
-      value: error ? "Offline" : "Online",
-      tone: error ? "indicator-red" : "indicator-green",
+      value: status?.backend_online ? "Online" : "Offline",
+      tone: status?.backend_online ? "indicator-green" : "indicator-red",
     },
     {
       label: "Camera",
