@@ -5,3 +5,6 @@ __pycache__/
 .env
 *.pth
 data/
+frontend/node_modules/
+frontend/dist/
+frontend/.vercel/
