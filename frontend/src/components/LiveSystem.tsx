@@ -40,6 +40,37 @@ const gestures = [
   { title: "Predict", detail: "Show a thumbs-up to classify" },
 ];
 
+function getCameraErrorMessage(error: unknown) {
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError") {
+      return "Camera permission was denied. Use the lock/camera icon in your browser bar and allow camera access.";
+    }
+    if (error.name === "NotFoundError") {
+      return "No camera device was found on this system.";
+    }
+    if (error.name === "NotReadableError") {
+      return "The camera is already in use by another application. Close other camera apps and try again.";
+    }
+    if (error.name === "SecurityError") {
+      return "Camera access is blocked by browser security settings.";
+    }
+    if (error.name === "OverconstrainedError") {
+      return "The requested camera settings are not supported on this device.";
+    }
+    return error.message || "The browser could not access the camera.";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return "Unable to access the browser camera.";
+}
+
 const LiveSystem = ({
   status,
   loading,
@@ -331,6 +362,30 @@ const LiveSystem = ({
     try {
       onSetError(null);
 
+      if (!window.isSecureContext) {
+        throw new Error("Camera access requires HTTPS or localhost.");
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("This browser does not support webcam access.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      if (!videoRef.current) {
+        return;
+      }
+
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
       if (!handLandmarkerRef.current) {
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm",
@@ -346,22 +401,6 @@ const LiveSystem = ({
         });
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-      if (!videoRef.current) {
-        return;
-      }
-
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
       onUpdateTrackingStatus({
         camera_active: true,
         hand_detected: false,
@@ -375,10 +414,8 @@ const LiveSystem = ({
         void processFrame();
       });
     } catch (nextError) {
-      const message =
-        nextError instanceof Error
-          ? nextError.message
-          : "Unable to access the browser camera.";
+      console.error("Camera startup failed:", nextError);
+      const message = getCameraErrorMessage(nextError);
       onSetError(message);
       stopCamera();
     }
