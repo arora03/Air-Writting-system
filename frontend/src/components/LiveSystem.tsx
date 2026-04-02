@@ -149,10 +149,15 @@ const LiveSystem = ({
   const lastPredictionTriggerRef = useRef(0);
   const lastLandmarksRef = useRef<Landmark[] | null>(null);
   const settingsRef = useRef(status?.settings);
+  const predictionRef = useRef(status?.prediction ?? null);
 
   useEffect(() => {
     settingsRef.current = status?.settings;
   }, [status?.settings]);
+
+  useEffect(() => {
+    predictionRef.current = status?.prediction ?? null;
+  }, [status?.prediction]);
 
   useEffect(() => {
     currentModeRef.current = status?.current_mode ?? "pause";
@@ -289,10 +294,14 @@ const LiveSystem = ({
     ctx.font = "bold 22px Arial";
     ctx.fillText(`Mode: ${currentModeRef.current}`, 26, 44);
 
-    if (status?.prediction) {
+    if (predictionRef.current) {
       ctx.fillStyle = "#67e8f9";
       ctx.font = "bold 20px Arial";
-      ctx.fillText(`Pred: ${status.prediction.label} (${status.prediction.confidence.toFixed(1)}%)`, 26, 74);
+      ctx.fillText(
+        `Pred: ${predictionRef.current.label} (${predictionRef.current.confidence.toFixed(1)}%)`,
+        26,
+        74,
+      );
     }
 
     if (pendingGestureRef.current && !gestureLockedRef.current) {
