@@ -73,7 +73,7 @@ const HeroSection = () => {
                 animate={{ scale: [0.9, 1.05, 1] }}
                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
               >
-                A
+                5
               </motion.span>
               <div className="absolute bottom-2 right-3 text-xs text-accent font-semibold">94% confidence</div>
             </div>

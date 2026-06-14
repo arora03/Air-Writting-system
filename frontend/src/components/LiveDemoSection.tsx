@@ -8,10 +8,9 @@ import { api } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import PredictionPanel from "./PredictionPanel";
 
-const GESTURE_DELAY_MS = 1500;
-const ERASE_DELAY_MS = 1000;
+const GESTURE_DELAY_MS = 2000;
 
-type GestureState = "writing" | "submitting" | "erasing" | null;
+type GestureState = "writing_waiting" | "writing" | "submitting" | "erasing" | "erased" | "predicting" | "predicted" | null;
 
 const LiveDemoSection = () => {
   const [cameraOn, setCameraOn] = useState(false);
@@ -19,7 +18,7 @@ const LiveDemoSection = () => {
   const [gestureProgress, setGestureProgress] = useState(0);
   const [gestureState, setGestureState] = useState<GestureState>(null);
   
-  // App Mode: digits vs alphabets (currently UI only, model is digits)
+  // App Mode: digits vs alphabets
   const [appMode, setAppMode] = useState<"digits" | "alphabets">("digits");
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -137,46 +136,69 @@ const LiveDemoSection = () => {
 
         // 1. Erase Gesture: Open Palm (All fingers up)
         if (isThumbExtended && isIndexExtended && isMiddleExtended && isRingExtended && isPinkyExtended) {
-          setGestureState("erasing");
-          if (!actionStartTimeRef.current) actionStartTimeRef.current = Date.now();
-          const elapsed = Date.now() - actionStartTimeRef.current;
-          setGestureProgress(Math.min((elapsed / ERASE_DELAY_MS) * 100, 100));
+          setGestureState((prev) => {
+            if (prev === "erased") return "erased";
+            
+            if (!actionStartTimeRef.current) actionStartTimeRef.current = Date.now();
+            const elapsed = Date.now() - actionStartTimeRef.current;
+            setGestureProgress(Math.min((elapsed / GESTURE_DELAY_MS) * 100, 100));
 
-          if (elapsed >= ERASE_DELAY_MS) {
-            actionStartTimeRef.current = null;
-            setGestureProgress(0);
-            clearCanvas();
-            toast.success("Canvas Erased!");
-          }
+            if (elapsed >= GESTURE_DELAY_MS) {
+              actionStartTimeRef.current = null;
+              setGestureProgress(0);
+              clearCanvas();
+              toast.success("Canvas Erased!");
+              return "erased";
+            }
+            return "erasing";
+          });
           prevIndexTipRef.current = null;
         } 
         // 2. Predict Gesture: Thumbs Up (Thumb up, rest folded)
         else if (isThumbExtended && isIndexFolded && isMiddleFolded && isRingFolded && isPinkyFolded) {
-          setGestureState("submitting");
-          if (!actionStartTimeRef.current) actionStartTimeRef.current = Date.now();
-          const elapsed = Date.now() - actionStartTimeRef.current;
-          setGestureProgress(Math.min((elapsed / GESTURE_DELAY_MS) * 100, 100));
+          setGestureState((prev) => {
+            if (prev === "predicted") return "predicted";
 
-          if (elapsed >= GESTURE_DELAY_MS && !isPredicting) {
-            actionStartTimeRef.current = null;
-            setGestureProgress(0);
-            sendPrediction();
-          }
+            if (!actionStartTimeRef.current) actionStartTimeRef.current = Date.now();
+            const elapsed = Date.now() - actionStartTimeRef.current;
+            setGestureProgress(Math.min((elapsed / GESTURE_DELAY_MS) * 100, 100));
+
+            if (elapsed >= GESTURE_DELAY_MS && !isPredicting) {
+              actionStartTimeRef.current = null;
+              setGestureProgress(0);
+              sendPrediction();
+              return "predicted";
+            }
+            return "submitting";
+          });
           prevIndexTipRef.current = null;
         }
         // 3. Write Gesture: Index extended, rest folded
         else if (isIndexExtended && isMiddleFolded && isRingFolded && isPinkyFolded) {
-          setGestureState("writing");
-          actionStartTimeRef.current = null;
-          setGestureProgress(0);
-          
-          if (prevIndexTipRef.current) {
-            drawCtx.beginPath();
-            drawCtx.moveTo(prevIndexTipRef.current.x, prevIndexTipRef.current.y);
-            drawCtx.lineTo(x, y);
-            drawCtx.stroke();
-          }
-          prevIndexTipRef.current = { x, y };
+          setGestureState((prev) => {
+            if (prev === "writing") {
+              if (prevIndexTipRef.current) {
+                drawCtx.beginPath();
+                drawCtx.moveTo(prevIndexTipRef.current.x, prevIndexTipRef.current.y);
+                drawCtx.lineTo(x, y);
+                drawCtx.stroke();
+              }
+              prevIndexTipRef.current = { x, y };
+              return "writing";
+            }
+
+            if (!actionStartTimeRef.current) actionStartTimeRef.current = Date.now();
+            const elapsed = Date.now() - actionStartTimeRef.current;
+            setGestureProgress(Math.min((elapsed / GESTURE_DELAY_MS) * 100, 100));
+
+            if (elapsed >= GESTURE_DELAY_MS) {
+              actionStartTimeRef.current = null;
+              setGestureProgress(0);
+              prevIndexTipRef.current = { x, y };
+              return "writing";
+            }
+            return "writing_waiting";
+          });
         } 
         // Idle
         else {
@@ -319,7 +341,7 @@ const LiveDemoSection = () => {
                   </motion.div>
                 )}
 
-                {cameraOn && (gestureState === "submitting" || gestureState === "erasing") && gestureProgress > 0 && (
+                {cameraOn && (gestureState === "submitting" || gestureState === "erasing" || gestureState === "writing_waiting") && gestureProgress > 0 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -328,11 +350,11 @@ const LiveDemoSection = () => {
                   >
                     <div className="bg-background/80 p-6 rounded-2xl border border-primary/50 text-center shadow-2xl">
                       <p className="text-xl font-bold gradient-text mb-4">
-                        {gestureState === "submitting" ? "🔍 Submitting Drawing..." : "🗑️ Erasing Canvas..."}
+                        {gestureState === "submitting" ? "🔍 Submitting Drawing..." : gestureState === "writing_waiting" ? "✍️ Initializing Pen..." : "🗑️ Erasing Canvas..."}
                       </p>
                       <div className="w-56 h-3 bg-secondary rounded-full overflow-hidden">
                         <div 
-                          className={`h-full transition-all duration-100 ease-linear ${gestureState === "submitting" ? "bg-primary" : "bg-destructive"}`}
+                          className={`h-full transition-all duration-100 ease-linear ${gestureState === "submitting" ? "bg-primary" : gestureState === "erasing" ? "bg-destructive" : "bg-accent"}`}
                           style={{ width: `${gestureProgress}%` }}
                         />
                       </div>
