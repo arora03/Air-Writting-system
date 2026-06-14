@@ -17,7 +17,6 @@ const Index = () => (
     <HeroSection />
     <LiveDemoSection />
     <SystemStatus />
-    <PredictionPanel />
     <TextOutputSection />
     <ControlPanel />
     <HowItWorks />
