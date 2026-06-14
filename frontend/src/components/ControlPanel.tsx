@@ -2,12 +2,13 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Settings } from "lucide-react";
 
+import { useAppStore } from "@/lib/store";
+
 const ControlPanel = () => {
-  const [smoothing, setSmoothing] = useState(true);
-  const [gesture, setGesture] = useState(false);
-  const [thickness, setThickness] = useState(3);
-  const [sensitivity, setSensitivity] = useState(70);
-  const [mode, setMode] = useState<"letter" | "digit">("letter");
+  const smoothing = useAppStore((state) => state.smoothing);
+  const setSmoothing = useAppStore((state) => state.setSmoothing);
+  const thickness = useAppStore((state) => state.thickness);
+  const setThickness = useAppStore((state) => state.setThickness);
 
   return (
     <section className="py-20 px-4">
@@ -27,33 +28,11 @@ const ControlPanel = () => {
             {/* Toggles */}
             <div className="space-y-4">
               <Toggle label="Enable Smoothing" checked={smoothing} onChange={setSmoothing} />
-              <Toggle label="Gesture Detection" checked={gesture} onChange={setGesture} />
             </div>
 
             {/* Sliders */}
             <div className="space-y-5">
               <SliderControl label="Stroke Thickness" value={thickness} min={1} max={8} onChange={setThickness} />
-              <SliderControl label="Sensitivity" value={sensitivity} min={10} max={100} onChange={setSensitivity} unit="%" />
-            </div>
-          </div>
-
-          {/* Mode selector */}
-          <div className="mt-6 pt-6 border-t border-glass-border">
-            <p className="text-sm text-muted-foreground mb-3">Recognition Mode</p>
-            <div className="flex gap-2">
-              {(["letter", "digit"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                    mode === m
-                      ? "bg-primary text-primary-foreground shadow-lg"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {m === "letter" ? "🔤 Letter Mode" : "🔢 Digit Mode"}
-                </button>
-              ))}
             </div>
           </div>
         </motion.div>

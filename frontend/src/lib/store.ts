@@ -13,6 +13,12 @@ interface AppState {
   // Predictions
   latestPrediction: PredictionResponse | null;
   setLatestPrediction: (pred: PredictionResponse) => void;
+
+  // Settings
+  thickness: number;
+  setThickness: (val: number) => void;
+  smoothing: boolean;
+  setSmoothing: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -24,4 +30,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   latestPrediction: null,
   setLatestPrediction: (pred) => set({ latestPrediction: pred }),
+
+  thickness: 4,
+  setThickness: (val) => set({ thickness: val }),
+  
+  smoothing: true,
+  setSmoothing: (val) => set({ smoothing: val }),
 }));

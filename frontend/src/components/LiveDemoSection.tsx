@@ -91,12 +91,15 @@ const LiveDemoSection = () => {
         skelCanvas.height = videoRef.current.videoHeight;
         drawCanvas.width = videoRef.current.videoWidth;
         drawCanvas.height = videoRef.current.videoHeight;
-        
-        drawCtx.lineCap = "round";
-        drawCtx.lineJoin = "round";
-        drawCtx.lineWidth = 12;
-        drawCtx.strokeStyle = "white";
       }
+      
+      const thickness = useAppStore.getState().thickness;
+      const smoothing = useAppStore.getState().smoothing;
+
+      drawCtx.lineCap = smoothing ? "round" : "butt";
+      drawCtx.lineJoin = smoothing ? "round" : "miter";
+      drawCtx.lineWidth = thickness * 3;
+      drawCtx.strokeStyle = "white";
 
       skelCtx.clearRect(0, 0, skelCanvas.width, skelCanvas.height);
 
