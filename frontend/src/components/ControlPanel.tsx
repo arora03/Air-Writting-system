@@ -46,6 +46,7 @@ const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean;
     <span className="text-sm text-foreground">{label}</span>
     <button
       onClick={() => onChange(!checked)}
+      aria-label={`Toggle ${label}`}
       className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
         checked ? "bg-primary" : "bg-secondary"
       }`}
@@ -59,21 +60,25 @@ const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean;
   </div>
 );
 
-const SliderControl = ({ label, value, min, max, onChange, unit }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void; unit?: string }) => (
-  <div>
-    <div className="flex justify-between mb-1.5">
-      <span className="text-sm text-foreground">{label}</span>
-      <span className="text-sm text-accent font-medium">{value}{unit}</span>
+const SliderControl = ({ label, value, min, max, onChange, unit }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void; unit?: string }) => {
+  const id = label.replace(/\s+/g, '-').toLowerCase();
+  return (
+    <div>
+      <div className="flex justify-between mb-1.5">
+        <label htmlFor={id} className="text-sm text-foreground">{label}</label>
+        <span className="text-sm text-accent font-medium">{value}{unit}</span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary"
+      />
     </div>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary"
-    />
-  </div>
-);
+  );
+};
 
 export default ControlPanel;
