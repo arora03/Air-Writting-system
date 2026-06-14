@@ -55,6 +55,10 @@ const LiveDemoSection = () => {
       if (ctx) {
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Flip horizontally to correct camera mirroring
+        ctx.translate(tempCanvas.width, 0);
+        ctx.scale(-1, 1);
         ctx.drawImage(canvas, 0, 0);
       }
 
