@@ -1,0 +1,7 @@
+opencv-python==4.9.0.80
+mediapipe==0.10.33
+numpy==1.26.4
+torch==2.2.2
+torchvision==0.17.2
+fastapi==0.115.0
+uvicorn==0.30.6

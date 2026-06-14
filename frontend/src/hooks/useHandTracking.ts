@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Hands, Results, Options } from "@mediapipe/hands";
-import { Camera } from "@mediapipe/camera_utils";
+import type { Hands, Results } from "@mediapipe/hands";
+import type { Camera } from "@mediapipe/camera_utils";
+
+declare global {
+  interface Window {
+    Hands: any;
+    Camera: any;
+  }
+}
 
 export const useHandTracking = (
   videoRef: React.RefObject<HTMLVideoElement>,
@@ -16,8 +23,13 @@ export const useHandTracking = (
   }, [onResults]);
 
   useEffect(() => {
-    const hands = new Hands({
-      locateFile: (file) => {
+    if (!window.Hands) {
+      console.error("MediaPipe Hands not loaded from CDN.");
+      return;
+    }
+
+    const hands = new window.Hands({
+      locateFile: (file: string) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
       },
     });
@@ -38,8 +50,8 @@ export const useHandTracking = (
   }, [handleResults]);
 
   const start = useCallback(() => {
-    if (videoRef.current && handsRef.current) {
-      const camera = new Camera(videoRef.current, {
+    if (videoRef.current && handsRef.current && window.Camera) {
+      const camera = new window.Camera(videoRef.current, {
         onFrame: async () => {
           if (videoRef.current && handsRef.current) {
             await handsRef.current.send({ image: videoRef.current });
