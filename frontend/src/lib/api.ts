@@ -42,6 +42,19 @@ export const api = {
     if (!res.ok) {
       throw new Error(`Prediction failed with status: ${res.status}`);
     }
-    return res.json();
+    
+    const data = await res.json();
+    if (!data.prediction) {
+      throw new Error(data.message || "No drawing detected.");
+    }
+
+    return {
+      prediction: data.prediction.label,
+      confidence: data.prediction.confidence,
+      top3: data.prediction.top_predictions?.map((p: any) => ({
+        char: p.label,
+        score: p.confidence
+      }))
+    };
   },
 };
