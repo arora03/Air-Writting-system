@@ -1,10 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Copy, Trash2, Download, Check } from "lucide-react";
+import { useAppStore } from "@/lib/store";
 
 const TextOutputSection = () => {
-  const [text, setText] = useState("HELLO WORLD");
+  const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
+  const latestPrediction = useAppStore((state) => state.latestPrediction);
+
+  useEffect(() => {
+    if (latestPrediction && latestPrediction.prediction) {
+      setText((prev) => prev + latestPrediction.prediction);
+    }
+  }, [latestPrediction]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
@@ -28,6 +36,7 @@ const TextOutputSection = () => {
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={3}
+              placeholder="Your recognized characters will appear here..."
               className="w-full bg-secondary/30 border border-glass-border rounded-xl px-4 py-3 text-foreground text-lg font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             />
           </div>
